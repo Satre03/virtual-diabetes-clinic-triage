@@ -11,7 +11,7 @@ permissions:
   packages: write
 
 jobs:
-  build-test:
+  ci:
     runs-on: ubuntu-latest
 
     steps:
@@ -37,7 +37,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
-      - name: Train model (baseline v0.1)
+      - name: Run unit tests
+        run: pytest -q
+
+      - name: Train model (quick check)
         run: python src/train.py
 
       - name: Show metrics
@@ -47,36 +50,10 @@ jobs:
           echo "=== meta.json ==="
           cat artifacts/meta.json || true
 
-      - name: Run tests
-        run: pytest -q
-
       - name: Build Docker image
         run: docker build -t diabetes-api .
 
-      # GHCR steps only on push (not for PRs from forks)
-      - name: Set GHCR image name
-        if: ${{ github.event_name == 'push' }}
-        run: echo "IMAGE=ghcr.io/satre03/virtual-diabetes-clinic-triage" >> $GITHUB_ENV
-
-      - name: Log in to GHCR
-        if: ${{ github.event_name == 'push' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Tag & push image to GHCR (branch + SHA)
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          BRANCH_TAG=$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | tr '/' '-')
-          docker tag diabetes-api $IMAGE:${BRANCH_TAG}
-          docker tag diabetes-api $IMAGE:sha-${GITHUB_SHA}
-          docker push $IMAGE:${BRANCH_TAG}
-          docker push $IMAGE:sha-${GITHUB_SHA}
-
       - name: Smoke test container
-        shell: bash
         run: |
           set -e
           cid=$(docker run -d -p 8000:8000 diabetes-api)
@@ -84,13 +61,6 @@ jobs:
             if curl -fsS http://localhost:8000/health > /dev/null; then
               echo "Health OK"
               break
-            fi
-            echo "Waiting for API... ($i)"
-            status=$(docker inspect -f '{{.State.Status}}' "$cid" || true)
-            if [ "$status" = "exited" ]; then
-              echo "Container exited early. Logs:"
-              docker logs "$cid" || true
-              exit 1
             fi
             sleep 1
           done
