@@ -35,6 +35,7 @@ jobs:
   build:
     needs: train
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
@@ -60,10 +61,10 @@ jobs:
           IMAGE_NAME=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9\/._-]//g' | sed 's/-*$//')
           echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
 
-      - name: Build Docker image
+      - name: Build Docker image (tagged v0.1)
         run: |
-          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:latest .
+          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:v0.1 .
 
-      - name: Push Docker image
+      - name: Push Docker image (tagged v0.1)
         run: |
-          docker push ghcr.io/${{ steps.vars.outputs.image }}:latest
+          docker push ghcr.io/${{ steps.vars.outputs.image }}:v0.1
