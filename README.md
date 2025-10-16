@@ -9,13 +9,13 @@ Projektet är byggt som en reproducerbar **MLOps-pipeline** med **GitHub Actions
 
 ## Kommandon för att köra projektet
 
-### Klona projektet
+### Clone the project
 ```bash
 git clone https://github.com/Satre03/virtual-diabetes-clinic-triage.git
 cd virtual-diabetes-clinic-triage
 ```
 
-Skapa och aktivera virtuell miljö
+Create and activate virtual environment
 MAC:
 ```bash
 python3 -m venv venv
@@ -27,35 +27,35 @@ WINDOWS:
 py -m venv venv
 venv\Scripts\activate
 ```
-Installerar beroenden
+Installing dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
-Träna modellen manuellt (valfritt)
+Train model manuelly (not required)
 ```bash
 python src/train.py
 ```
-Bygg Docker-image
+Build Docker-image
 ```bash
-docker build -t ghcr.io/melissawestberg/diabetes_risk_service:v0.3 .
+docker build -t ghcr.io/satre03/virtual-diabetes-clinic-triage:v.01 .
 ```
-Kör containern
+Run containern
 ```bash
-docker run -p 8000:8000 ghcr.io/melissawestberg/diabetes_risk_service:v0.3
+docker run -p 8000:8000 ghcr.io/satre03/virtual-diabetes-clinic-triage:v.01
 ```
-Öppna sedan i webbläsaren:
+Open in browser:
 ```bash
 http://localhost:8000/health
 ```
 
-Förväntat svar:
+Excepted answer:
 ```bash
-{"status": "ok", "model_version": "v0.3"}
+{"status": "ok", "model_version": "v0.1"}
 ```
 
 
-Exempel på payload för /predict
+Example payload using /predict
 Skicka med curl:
 ```bash
 curl -X POST http://localhost:8000/predict \
@@ -85,5 +85,6 @@ Då nås API:t på:
 ```bash
 http://localhost:8002/health
 ```
+
 
 
