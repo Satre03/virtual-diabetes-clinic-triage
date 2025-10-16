@@ -1,1 +1,37 @@
+name: Train and Build
 
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Train v0.1 baseline
+        run: python -c "import sys; sys.path.append('.'); from src.train import main; main(pipeline='baseline', version='0.1.0')"
+      - name: Print metrics
+        run: cat artifacts/metrics.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts
+          path: artifacts/*
+
+  build:
+    needs: train
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: artifacts
+      - name: Build Docker image
+        run: docker build -t virtual-diabetes-triage:latest .
