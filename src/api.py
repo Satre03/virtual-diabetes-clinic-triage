@@ -1,20 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from pathlib import Path
-import joblib
-import json
-import numpy as np
+from contextlib import asynccontextmanager
+import os, json, joblib, numpy as np
 
 ART_DIR = Path("artifacts")
 MODEL_PATH = ART_DIR / "model.joblib"
 META_PATH = ART_DIR / "meta.json"
 
-# Accept either a flat features list OR named diabetes features (age..s6)
 class PredictRequest(BaseModel):
-    features: list[float] | None = Field(
-        default=None, description="Optional flat feature vector of length 10"
-    )
+    features: list[float] | None = Field(default=None)
     age: float | None = None
     sex: float | None = None
     bmi: float | None = None
@@ -39,41 +35,49 @@ class PredictRequest(BaseModel):
 class PredictResponse(BaseModel):
     prediction: float
     model_version: str
-    # silence pydantic warning about `model_` namespace
     model_config = {"protected_namespaces": ()}
 
-app = FastAPI(title="Virtual Diabetes Clinic Triage", version="0.1.0")
-_model = None
-_meta = {"version": "unknown"}
-
-@app.on_event("startup")
-def _startup():
-    global _model, _meta
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.model = None
+    app.state.meta = {"version": "unknown"}
     try:
         if MODEL_PATH.exists():
-            _model = joblib.load(MODEL_PATH)
+            app.state.model = joblib.load(MODEL_PATH)
         if META_PATH.exists():
-            _meta = json.loads(META_PATH.read_text())
+            app.state.meta = json.loads(META_PATH.read_text())
     except Exception:
-        _model = None
-        _meta = {"version": "unknown"}
+        app.state.model = None
+        app.state.meta = {"version": "unknown"}
+    yield
+
+app = FastAPI(title="Virtual Diabetes Clinic Triage", version="0.1.0", lifespan=lifespan)
+
+def get_model(req: Request):
+    mdl = getattr(req.app.state, "model", None)
+    if mdl is None:
+        if os.getenv("ALLOW_DUMMY_MODEL", "1") == "1":
+            return lambda X: np.array([0.0])
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    return mdl
 
 @app.get("/health")
-def health():
-    return {"status": "ok", "model_version": _meta.get("version", "unknown")}
+def health(req: Request):
+    return {"status": "ok", "model_version": req.app.state.meta.get("version", "unknown")}
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest):
-    if _model is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+def predict(req: PredictRequest, model=Depends(get_model), app_req: Request = None):
     try:
         vec = req.to_feature_list()
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     X = np.asarray(vec, dtype=float).reshape(1, -1)
-    y = float(_model.predict(X)[0])
-    return PredictResponse(prediction=y, model_version=_meta.get("version", "unknown"))
+    try:
+        y = float(model.predict(X)[0])
+    except AttributeError:
+        y = float(model(X)[0])
+    return PredictResponse(prediction=y, model_version=getattr(app_req.app.state, "meta", {}).get("version", "unknown"))
 
-@app.exception_handler(Exception)
-async def _json_error(_, exc: Exception):
+@app.exception_handler(ValueError)
+async def _value_error_handler(_, exc: ValueError):
     return JSONResponse(status_code=400, content={"detail": str(exc)})
