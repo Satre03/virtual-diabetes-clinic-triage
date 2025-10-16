@@ -1,12 +1,5 @@
-# Core ML stack
-scikit-learn==1.3.2
-joblib==1.3.2
-# API framework
-fastapi==0.100.0
-uvicorn[standard]==0.22.0
-# Data validation
-pydantic==1.10.13
-# Testing
-pytest==7.4.2
-# Optional: for typing and linting (optional but nice to have)
-mypy==1.6.1
+fastapi
+uvicorn
+scikit-learn
+joblib
+numpy
