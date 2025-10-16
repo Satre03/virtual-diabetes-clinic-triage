@@ -10,12 +10,37 @@ ART_DIR = Path("artifacts")
 MODEL_PATH = ART_DIR / "model.joblib"
 META_PATH = ART_DIR / "meta.json"
 
+# Accept either a flat features list OR named diabetes features (age..s6)
 class PredictRequest(BaseModel):
-    features: list[float] = Field(..., description="Feature vector of length 10 (sklearn diabetes)")
+    features: list[float] | None = Field(
+        default=None, description="Optional flat feature vector of length 10"
+    )
+    age: float | None = None
+    sex: float | None = None
+    bmi: float | None = None
+    bp: float | None = None
+    s1: float | None = None
+    s2: float | None = None
+    s3: float | None = None
+    s4: float | None = None
+    s5: float | None = None
+    s6: float | None = None
+
+    def to_feature_list(self) -> list[float]:
+        if self.features is not None:
+            if len(self.features) != 10:
+                raise ValueError(f"Expected 10 features, got {len(self.features)}")
+            return [float(x) for x in self.features]
+        ordered = [self.age, self.sex, self.bmi, self.bp, self.s1, self.s2, self.s3, self.s4, self.s5, self.s6]
+        if any(v is None for v in ordered):
+            raise ValueError("Provide all named features (age, sex, bmi, bp, s1..s6) or a 10-length 'features' list.")
+        return [float(x) for x in ordered]
 
 class PredictResponse(BaseModel):
     prediction: float
     model_version: str
+    # silence pydantic warning about `model_` namespace
+    model_config = {"protected_namespaces": ()}
 
 app = FastAPI(title="Virtual Diabetes Clinic Triage", version="0.1.0")
 _model = None
@@ -29,10 +54,9 @@ def _startup():
             _model = joblib.load(MODEL_PATH)
         if META_PATH.exists():
             _meta = json.loads(META_PATH.read_text())
-    except Exception as e:
+    except Exception:
         _model = None
         _meta = {"version": "unknown"}
-        # still boot; observability via JSON errors
 
 @app.get("/health")
 def health():
@@ -42,9 +66,11 @@ def health():
 def predict(req: PredictRequest):
     if _model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
-    if len(req.features) != 10:
-        raise HTTPException(status_code=422, detail=f"Expected 10 features, got {len(req.features)}")
-    X = np.array(req.features, dtype=float).reshape(1, -1)
+    try:
+        vec = req.to_feature_list()
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    X = np.asarray(vec, dtype=float).reshape(1, -1)
     y = float(_model.predict(X)[0])
     return PredictResponse(prediction=y, model_version=_meta.get("version", "unknown"))
 
