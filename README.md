@@ -11,8 +11,8 @@ Projektet är byggt som en reproducerbar **MLOps-pipeline** med **GitHub Actions
 
 ### Klona projektet
 ```bash
-git clone [https://github.com/MelissaWestberg/diabetes_risk_service.git](https://github.com/Satre03/virtual-diabetes-clinic-triage.git)
-cd diabetes_risk_service
+git clone https://github.com/Satre03/virtual-diabetes-clinic-triage.git
+cd virtual-diabetes-clinic-triage
 ```
 
 Skapa och aktivera virtuell miljö
@@ -85,4 +85,5 @@ Då nås API:t på:
 ```bash
 http://localhost:8002/health
 ```
+
 
