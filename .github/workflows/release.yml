@@ -13,12 +13,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - run: pip install -r requirements.txt
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
       - name: Train v0.1 baseline
-        run: python -c "import sys; sys.path.append('.'); from src.train import main; main(pipeline='baseline', version='0.1.0')"
+        run: python src/train.py
       - name: Print metrics
-        run: cat artifacts/metrics.json
+        run: cat artifacts/metrics.json || true
       - uses: actions/upload-artifact@v4
         with:
           name: artifacts
