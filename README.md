@@ -2,8 +2,8 @@
 
 # Diabetes Risk Service
 
-Detta projekt är en liten ML-tjänst som förutspår kortsiktig diabetesprogression baserat på det öppna *scikit-learn Diabetes*-datasetet.  
-Projektet är byggt som en reproducerbar **MLOps-pipeline** med **GitHub Actions** och **Docker**.
+This project is a small ML-service designed to predict shortterm diabetes progression by using the open *scikit-learn Diabetes* dataset. 
+The Project i build to reproduce **MLOps-pipeline** with **GitHub Actions** and **Docker**
 
 ---
 
@@ -83,6 +83,7 @@ Då nås API:t på:
 ```bash
 http://localhost:8002/health
 ```
+
 
 
 
