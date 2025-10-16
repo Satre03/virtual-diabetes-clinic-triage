@@ -48,26 +48,32 @@ jobs:
           cat artifacts/meta.json || true
 
       - name: Run tests
-        run: pytest -q || true
+        run: pytest -q
 
       - name: Build Docker image
         run: docker build -t diabetes-api .
 
+      # GHCR steps only on push (not for PRs from forks)
+      - name: Set GHCR image name
+        if: ${{ github.event_name == 'push' }}
+        run: echo "IMAGE=ghcr.io/satre03/virtual-diabetes-clinic-triage" >> $GITHUB_ENV
+
       - name: Log in to GHCR
+        if: ${{ github.event_name == 'push' }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image to GHCR (branch + SHA tags)
+      - name: Tag & push image to GHCR (branch + SHA)
+        if: ${{ github.event_name == 'push' }}
         run: |
-          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}"
-          docker tag diabetes-api $IMAGE:${{ github.ref_name }}
-          docker tag diabetes-api $IMAGE:sha-${{ github.sha }}
-          docker push $IMAGE:${{ github.ref_name }}
-          docker push $IMAGE:sha-${{ github.sha }}
+          BRANCH_TAG=$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | tr '/' '-')
+          docker tag diabetes-api $IMAGE:${BRANCH_TAG}
+          docker tag diabetes-api $IMAGE:sha-${GITHUB_SHA}
+          docker push $IMAGE:${BRANCH_TAG}
+          docker push $IMAGE:sha-${GITHUB_SHA}
 
       - name: Smoke test container
         shell: bash
