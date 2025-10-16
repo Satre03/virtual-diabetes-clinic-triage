@@ -58,9 +58,9 @@ Excepted answer:
 Example payload using /predict
 Skicka med curl:
 ```bash
-curl -X POST http://localhost:8000/predict \
--H "Content-Type: application/json" \
--d '{
+curl -Method POST http://localhost:8000/predict `
+-Headers @{ "Content-Type" = "application/json" } `
+-Body '{
   "age": 0.02,
   "sex": -0.044,
   "bmi": 0.06,
@@ -75,7 +75,7 @@ curl -X POST http://localhost:8000/predict \
 ```
 Förväntat svar:
 ```bash
-{"prediction": 153.2}
+{"prediction": 235.9}
 ```
 Kör containern
 ```bash
@@ -85,6 +85,7 @@ Då nås API:t på:
 ```bash
 http://localhost:8002/health
 ```
+
 
 
 
