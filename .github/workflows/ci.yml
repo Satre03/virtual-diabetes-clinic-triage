@@ -38,7 +38,7 @@ jobs:
           pip install pytest
 
       - name: Run unit tests
-        run: pytest -q
+        run: PYTHONPATH=$(pwd) pytest -q
 
       - name: Train model (quick check)
         run: python src/train.py
