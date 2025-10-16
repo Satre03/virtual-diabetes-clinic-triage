@@ -56,13 +56,21 @@ jobs:
       - name: Smoke test container
         run: |
           set -e
-          cid=$(docker run -d -p 8000:8000 diabetes-api)
+          cid=$(docker run -d -p 8000:8000 -e ALLOW_DUMMY_MODEL=1 diabetes-api)
+          echo "Started container: $cid"
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:8000/health > /dev/null; then
-              echo "Health OK"
+              echo "✅ Health OK"
               break
             fi
+            echo "Waiting for health... ($i/30)"
             sleep 1
           done
-          curl -fsS http://localhost:8000/health
+          echo "--- /health ---"
+          curl -fsS http://localhost:8000/health | jq .
+          echo "--- /predict ---"
+          curl -fsS -X POST http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{"age":0.02,"sex":-0.044,"bmi":0.06,"bp":-0.03,"s1":-0.02,"s2":0.03,"s3":-0.02,"s4":0.02,"s5":0.02,"s6":-0.001}' \
+            | jq .
           docker stop "$cid" >/dev/null
