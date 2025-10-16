@@ -11,27 +11,30 @@ Projektet är byggt som en reproducerbar **MLOps-pipeline** med **GitHub Actions
 
 ### Klona projektet
 ```bash
-git clone https://github.com/MelissaWestberg/diabetes_risk_service.git
+git clone [https://github.com/MelissaWestberg/diabetes_risk_service.git](https://github.com/Satre03/virtual-diabetes-clinic-triage.git)
 cd diabetes_risk_service
 ```
 
 Skapa och aktivera virtuell miljö
-
+MAC:
 ```bash
 python3 -m venv venv
-source venv/bin/activate   # macOS/Linux
-venv\Scripts\activate      # Windows
+source venv/bin/activate 
+```
 
+WINDOWS:
+``` bash
+py -m venv venv
+venv\Scripts\activate
 ```
 Installerar beroenden
-
 
 ```bash
 pip install -r requirements.txt
 ```
 Träna modellen manuellt (valfritt)
 ```bash
-python src/train_model.py
+python src/train.py
 ```
 Bygg Docker-image
 ```bash
@@ -82,3 +85,4 @@ Då nås API:t på:
 ```bash
 http://localhost:8002/health
 ```
+
