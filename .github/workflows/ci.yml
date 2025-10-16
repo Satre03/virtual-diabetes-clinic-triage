@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -31,6 +35,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest
 
       - name: Train model (baseline v0.1)
         run: python src/train.py
@@ -43,22 +48,44 @@ jobs:
           cat artifacts/meta.json || true
 
       - name: Run tests
-        run: |
-          pytest -q || true
+        run: pytest -q || true
 
       - name: Build Docker image
+        run: docker build -t diabetes-api .
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image to GHCR (branch + SHA tags)
         run: |
-          docker build -t diabetes-api .
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${REPO_LC}"
+          docker tag diabetes-api $IMAGE:${{ github.ref_name }}
+          docker tag diabetes-api $IMAGE:sha-${{ github.sha }}
+          docker push $IMAGE:${{ github.ref_name }}
+          docker push $IMAGE:sha-${{ github.sha }}
 
       - name: Smoke test container
+        shell: bash
         run: |
+          set -e
           cid=$(docker run -d -p 8000:8000 diabetes-api)
-          for i in {1..20}; do
+          for i in $(seq 1 30); do
             if curl -fsS http://localhost:8000/health > /dev/null; then
               echo "Health OK"
               break
             fi
             echo "Waiting for API... ($i)"
+            status=$(docker inspect -f '{{.State.Status}}' "$cid" || true)
+            if [ "$status" = "exited" ]; then
+              echo "Container exited early. Logs:"
+              docker logs "$cid" || true
+              exit 1
+            fi
             sleep 1
           done
           curl -fsS http://localhost:8000/health
