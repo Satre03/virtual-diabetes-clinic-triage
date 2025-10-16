@@ -1,10 +1,13 @@
-name: Train and Build
+name: Release
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - 'v*'  # triggers on v0.1, v0.2 etc.
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   train:
@@ -21,18 +24,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Train v0.1 baseline
+      - name: Train model
         run: python src/train.py
-
-      - name: Print metrics
-        run: cat artifacts/metrics.json || true
 
       - uses: actions/upload-artifact@v4
         with:
           name: artifacts
           path: artifacts/*
 
-  build:
+  build-and-push:
     needs: train
     runs-on: ubuntu-latest
 
@@ -48,23 +48,25 @@ jobs:
           name: artifacts
           path: artifacts
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sanitize repo name and set image name
+      - name: Set image name from repo
         id: vars
         run: |
-          IMAGE_NAME=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9\/._-]//g' | sed 's/-*$//')
+          IMAGE_NAME=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]' | sed 's/-*$//')
           echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          TAG=${GITHUB_REF##*/}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Build Docker image (tagged v0.1)
+      - name: Build Docker image
         run: |
-          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:v0.1 .
+          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} .
 
-      - name: Push Docker image (tagged v0.1)
+      - name: Push Docker image
         run: |
-          docker push ghcr.io/${{ steps.vars.outputs.image }}:v0.1
+          docker push ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
