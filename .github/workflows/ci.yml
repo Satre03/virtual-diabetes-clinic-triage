@@ -32,20 +32,41 @@ jobs:
           python src/train-v0.2.py
           PYTHONPATH=$(pwd) pytest -q
 
-      - name: Build Docker image (tag v0.2)
+      - name: Upload model artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: model
+          path: |
+            artifacts/model.joblib
+            artifacts/meta.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Compute image name and tags
+        id: tags
+        shell: bash
         run: |
+          set -euo pipefail
           REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
           IMAGE="ghcr.io/${REPO_LC}"
-          docker build -t "${IMAGE}:v0.2" .
+          TAGS="${IMAGE}:${GITHUB_REF_NAME} ${IMAGE}:${GITHUB_SHA}"
+          echo "TAGS=${TAGS}" >> "$GITHUB_ENV"
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+          echo "Tags: $TAGS"
+
+      - name: Build Docker image
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          docker build $(for t in $TAGS; do printf -- '-t %s ' "$t"; done) .
 
       - name: Smoke test
         shell: bash
         run: |
           set -euo pipefail
-          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}:v0.2"
+          IMAGE_TAG=$(echo "$TAGS" | awk '{print $1}') # first tag
           CID=ci-smoke
-          docker run -d --name "$CID" -p 8000:8000 "$IMAGE"
+          docker run -d --name "$CID" -p 8000:8000 "$IMAGE_TAG"
           trap 'docker logs "$CID" || true; docker rm -f "$CID" || true' EXIT
           for i in {1..30}; do
             if curl -fsS http://localhost:8000/health >/dev/null; then
@@ -65,9 +86,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image (v0.2)
+      - name: Push image(s)
         if: ${{ github.event_name != 'pull_request' }}
         run: |
-          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}:v0.2"
-          docker push "$IMAGE"
+          set -euo pipefail
+          for tag in $TAGS; do
+            docker push "$tag"
+          done
