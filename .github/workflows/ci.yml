@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REPO_LC: ${{ github.repository }} # will be lowercased in shell
-      TAG_BRANCH: ${{ github.ref_name }}
-      TAG_SHA: ${{ github.sha }}
 
     steps:
       - name: Checkout
@@ -34,18 +32,18 @@ jobs:
           python src/train-v0.2.py
           PYTHONPATH=$(pwd) pytest -q
 
-      - name: Build Docker image
+      - name: Build Docker image (tag v0.2)
         run: |
           REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
           IMAGE="ghcr.io/${REPO_LC}"
-          docker build -t "${IMAGE}:${TAG_BRANCH}" -t "${IMAGE}:${TAG_SHA}" .
+          docker build -t "${IMAGE}:v0.2" .
 
       - name: Smoke test
         shell: bash
         run: |
           set -euo pipefail
           REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}:${TAG_BRANCH}"
+          IMAGE="ghcr.io/${REPO_LC}:v0.2"
           CID=ci-smoke
           docker run -d --name "$CID" -p 8000:8000 "$IMAGE"
           trap 'docker logs "$CID" || true; docker rm -f "$CID" || true' EXIT
@@ -67,10 +65,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image
+      - name: Push image (v0.2)
         if: ${{ github.event_name != 'pull_request' }}
         run: |
           REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}"
-          docker push "${IMAGE}:${TAG_BRANCH}"
-          docker push "${IMAGE}:${TAG_SHA}"
+          IMAGE="ghcr.io/${REPO_LC}:v0.2"
+          docker push "$IMAGE"
