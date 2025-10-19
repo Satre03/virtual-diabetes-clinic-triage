@@ -7,8 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ARG MODEL_VERSION
-ENV MODEL_VERSION=${MODEL_VERSION}
+COPY artifacts/meta.json ./artifacts/meta.json
 
 EXPOSE 8000
 
