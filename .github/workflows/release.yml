@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'  # triggers on tags like v0.1, v0.2, etc.
+      - 'v*'  # triggers on v0.1, v0.2 etc.
 
 permissions:
   contents: read
@@ -25,11 +25,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Train model
-        run: |
-          # Strip the leading 'v' from the tag name, e.g. 'v0.1' -> '0.1'
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "Training model version $VERSION"
-          python src/train-v0.1.py --version $VERSION
+        run: python src/train-v0.1.py
 
       - uses: actions/upload-artifact@v4
         with:
