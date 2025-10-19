@@ -71,8 +71,8 @@ def get_model(req: Request):
 
 @app.get("/health")
 def health(request: Request):
-    version = request.app.state.meta.get("version", "unknown")
-    return {"status": "ok", "model_version": version}
+    return {"status": "ok", "model_version": request.app.state.meta.get("version")}
+
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest, request: Request, model=Depends(get_model)):
