@@ -7,8 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Always set a default version, can be overridden by CI
-ARG MODEL_VERSION=v0.0
+# This ARG will be set by GitHub Actions
+ARG MODEL_VERSION
 ENV MODEL_VERSION=${MODEL_VERSION}
 
 EXPOSE 8000
