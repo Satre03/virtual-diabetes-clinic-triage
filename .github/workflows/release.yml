@@ -1,88 +1,99 @@
-name: Release
+name: CI - Train and Test
 
 on:
   push:
-    tags:
-      - 'v*'  # Triggers on tags like v0.1, v0.2
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 permissions:
   contents: read
   packages: write
 
 jobs:
-  train:
+  build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    env:
+      REPO_LC: ${{ github.repository }}
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt pytest
 
-      - name: Train model dynamically based on tag
+      - name: Train model
         run: |
-          # Extract version (e.g. v0.1 → 0.1)
-          VERSION="${GITHUB_REF#refs/tags/v}"
-          echo "Using VERSION=$VERSION"
+          echo "Starting model training..."
+          python src/train-v0.1.py
 
-          # Match to training script name
-          TRAIN_SCRIPT="src/train-v$VERSION.py"
-          echo "Looking for training script: $TRAIN_SCRIPT"
+      - name: Run tests
+        run: |
+          echo "Running tests..."
+          PYTHONPATH=$(pwd) pytest -q
 
-          # Check existence
-          if [ ! -f "$TRAIN_SCRIPT" ]; then
-            echo "❌ Script $TRAIN_SCRIPT not found."
-            exit 1
-          fi
-
-          # Run training script with --version
-          python "$TRAIN_SCRIPT" --version "$VERSION"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: artifacts
-          path: artifacts/*
-
-  build-and-push:
-    needs: train
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: artifacts
-          path: artifacts
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set image name and tag
+      - name: Set image name and tag from training filename
         id: vars
+        shell: bash
         run: |
-          IMAGE_NAME=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
-          TAG=${GITHUB_REF##*/}
-          echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          set -e
+          REPO="${REPO_LC,,}"
+          TRAIN_FILE="src/train-v0.1.py"
+          TAG=$(echo "$TRAIN_FILE" | grep -oE 'v[0-9]+(\.[0-9]+)*' || true)
+          if [ -z "$TAG" ]; then TAG="${GITHUB_SHA::7}"; fi
+          echo "repo=ghcr.io/${REPO}" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # 👇 NEW STEP HERE — writes artifacts/meta.json automatically
+      - name: Write version file
+        run: |
+          mkdir -p artifacts
+          printf '{"version":"%s"}' "${{ steps.vars.outputs.tag }}" > artifacts/meta.json
+          echo "Created artifacts/meta.json with version ${{ steps.vars.outputs.tag }}"
+          cat artifacts/meta.json
 
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} .
+          docker build \
+            --build-arg MODEL_VERSION=${{ steps.vars.outputs.tag }} \
+            -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
+
+      - name: Smoke test container
+        run: |
+          set -e
+          IMAGE="${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}"
+          CID=ci-smoke
+          echo "Running smoke test..."
+          docker run -d --name "$CID" -p 8000:8000 "$IMAGE"
+          trap 'docker logs "$CID" || true; docker rm -f "$CID" || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              echo "Healthcheck OK"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Healthcheck failed"
+          exit 1
+
+      - name: Log in to GHCR
+        if: ${{ github.event_name != 'pull_request' }}
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Push Docker image
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
-          docker push ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+          echo "Pushing image..."
+          docker push ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}
+
+      - name: Done
+        run: |
+          echo "CI pipeline complete for image: ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}"
