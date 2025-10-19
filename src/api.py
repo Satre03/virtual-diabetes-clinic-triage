@@ -37,29 +37,21 @@ class PredictResponse(BaseModel):
     model_version: str
     model_config = {"protected_namespaces": ()}
 
-def _resolve_version() -> str:
-    v = os.getenv("MODEL_VERSION")
-    if v:
-        return v
-    try:
-        if META_PATH.exists():
-            return json.loads(META_PATH.read_text()).get("version", "unknown")
-    except Exception:
-        pass
-    return "unknown"
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.model = None
-    app.state.meta = {"version": _resolve_version()}
+    app.state.meta = {"version": "unknown"}
     try:
         if MODEL_PATH.exists():
             app.state.model = joblib.load(MODEL_PATH)
+        if META_PATH.exists():
+            app.state.meta = json.loads(META_PATH.read_text())
     except Exception:
         app.state.model = None
+        app.state.meta = {"version": "unknown"}
     yield
 
-app = FastAPI(title="Virtual Diabetes Clinic Triage", version=_resolve_version(), lifespan=lifespan)
+app = FastAPI(title="Virtual Diabetes Clinic Triage", version="0.1.0", lifespan=lifespan)
 
 def get_model(req: Request):
     mdl = getattr(req.app.state, "model", None)
@@ -70,12 +62,11 @@ def get_model(req: Request):
     return mdl
 
 @app.get("/health")
-def health(request: Request):
-    return {"status": "ok", "model_version": request.app.state.meta.get("version")}
-
+def health(req: Request):
+    return {"status": "ok", "model_version": req.app.state.meta.get("version", "unknown")}
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest, request: Request, model=Depends(get_model)):
+def predict(req: PredictRequest, model=Depends(get_model), app_req: Request = None):
     try:
         vec = req.to_feature_list()
     except ValueError as e:
@@ -85,8 +76,7 @@ def predict(req: PredictRequest, request: Request, model=Depends(get_model)):
         y = float(model.predict(X)[0])
     except AttributeError:
         y = float(model(X)[0])
-    version = request.app.state.meta.get("version", "unknown")
-    return PredictResponse(prediction=y, model_version=version)
+    return PredictResponse(prediction=y, model_version=getattr(app_req.app.state, "meta", {}).get("version", "unknown"))
 
 @app.exception_handler(ValueError)
 async def _value_error_handler(_, exc: ValueError):
