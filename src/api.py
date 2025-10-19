@@ -5,6 +5,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 import os, json, joblib, numpy as np
 
+# Expect artifacts folder at the root, next to src/
 ART_DIR = Path("artifacts")
 MODEL_PATH = ART_DIR / "model.joblib"
 META_PATH = ART_DIR / "meta.json"
@@ -35,7 +36,6 @@ class PredictRequest(BaseModel):
 class PredictResponse(BaseModel):
     prediction: float
     model_version: str
-    model_config = {"protected_namespaces": ()}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
