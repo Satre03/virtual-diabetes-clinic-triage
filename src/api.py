@@ -62,8 +62,10 @@ def get_model(req: Request):
     return mdl
 
 @app.get("/health")
-def health(req: Request):
-    return {"status": "ok", "model_version": req.app.state.meta.get("version", "unknown")}
+def health(request: Request):
+    version = getattr(request.app.state, "meta", {}).get("version", "unknown")
+    return {"status": "ok", "model_version": version}
+
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest, model=Depends(get_model), app_req: Request = None):
