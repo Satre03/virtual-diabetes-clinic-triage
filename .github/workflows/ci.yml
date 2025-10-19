@@ -2,9 +2,10 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "master", "ite2" ]
+    branches: [ "**" ]         # Run on all branches
+    tags:     [ "v*" ]         # Also run on version tags like v0.1, v0.2
   pull_request:
-    branches: [ "main", "master", "ite2" ]
+    branches: [ "**" ]         # Run on all PRs for any branch
 
 permissions:
   contents: read
@@ -14,9 +15,7 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     env:
-      REPO_LC: ${{ github.repository }} # will be lowercased in shell
-      TAG_BRANCH: ${{ github.ref_name }}
-      TAG_SHA: ${{ github.sha }}
+      REPO_LC: ${{ github.repository }}
 
     steps:
       - name: Checkout
@@ -34,18 +33,35 @@ jobs:
           python src/train.py
           PYTHONPATH=$(pwd) pytest -q
 
+      - name: Set image name and tag
+        id: vars
+        run: |
+          REPO=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
+          echo "repo=ghcr.io/${REPO}" >> $GITHUB_OUTPUT
+
+          # Determine if this is a tag or branch
+          REF_TYPE="${GITHUB_REF_TYPE:-}"
+          REF_NAME="${GITHUB_REF_NAME:-}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          if [[ "$REF_TYPE" == "tag" ]]; then
+            # Use tag name directly
+            TAG="$REF_NAME"
+          else
+            # Use branchname-sha for uniqueness
+            TAG="${REF_NAME}-${SHORT_SHA}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
       - name: Build Docker image
         run: |
-          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}"
-          docker build -t "${IMAGE}:${TAG_BRANCH}" -t "${IMAGE}:${TAG_SHA}" .
+          docker build -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
 
       - name: Smoke test
         shell: bash
         run: |
           set -euo pipefail
-          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}:${TAG_BRANCH}"
+          IMAGE="${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}"
           CID=ci-smoke
           docker run -d --name "$CID" -p 8000:8000 "$IMAGE"
           trap 'docker logs "$CID" || true; docker rm -f "$CID" || true' EXIT
@@ -70,7 +86,4 @@ jobs:
       - name: Push image
         if: ${{ github.event_name != 'pull_request' }}
         run: |
-          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}"
-          docker push "${IMAGE}:${TAG_BRANCH}"
-          docker push "${IMAGE}:${TAG_SHA}"
+          docker push ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}
