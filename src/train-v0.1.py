@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import json
 import joblib
 import numpy as np
+import os
 from sklearn.datasets import load_diabetes
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
@@ -39,9 +40,12 @@ artifacts_dir.mkdir(parents=True, exist_ok=True)
 
 joblib.dump(pipeline, artifacts_dir / "model.joblib")
 
+# Use MODEL_VERSION from environment, fallback to "0.1.0"
+version = os.getenv("MODEL_VERSION", "0.1.0")
+
 meta = {
     "pipeline": "baseline",
-    "version": "0.1.0",
+    "version": version,
     "rmse": rmse,
     "trained_at": datetime.now(timezone.utc).isoformat()
 }
