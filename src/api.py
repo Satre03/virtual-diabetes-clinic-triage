@@ -54,7 +54,8 @@ class PredictRequest(BaseModel):
 
         if any(v is None for v in ordered):
             raise ValueError(
-                "Provide all named features (age, sex, bmi, bp, s1..s6) or a 10-length 'features' list."
+                "Provide all named features (age, sex, bmi, bp, s1..s6) or "
+                "a 10-length 'features' list."
             )
 
         return [float(x) for x in ordered]
@@ -125,7 +126,9 @@ def predict(req: PredictRequest, model=Depends(get_model), app_req: Request = No
 
     return PredictResponse(
         prediction=y,
-        model_version=getattr(app_req.app.state, "meta", {}).get("version", "unknown"),
+        model_version=getattr(
+            app_req.app.state, "meta", {}
+        ).get("version", "unknown"),
     )
 
 
