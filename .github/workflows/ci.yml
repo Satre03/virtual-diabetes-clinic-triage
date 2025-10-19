@@ -30,16 +30,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
 
-      - name: Train model
-        run: |
-          echo "Starting model training..."
-          python src/train-v0.1.py
-
-      - name: Run tests
-        run: |
-          echo "Running tests..."
-          PYTHONPATH=$(pwd) pytest -q
-
       - name: Set image name and tag from training filename
         id: vars
         shell: bash
@@ -55,12 +45,17 @@ jobs:
           echo "repo=ghcr.io/${REPO}" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Write version file
+      - name: Train model
+        env:
+          MODEL_VERSION: ${{ steps.vars.outputs.tag }}
         run: |
-          mkdir -p artifacts
-          printf '{"version":"%s"}' "${{ steps.vars.outputs.tag }}" > artifacts/meta.json
-          echo "Created artifacts/meta.json with version ${{ steps.vars.outputs.tag }}"
-          cat artifacts/meta.json
+          echo "Starting model training with MODEL_VERSION=$MODEL_VERSION ..."
+          python src/train-v0.1.py
+
+      - name: Run tests
+        run: |
+          echo "Running tests..."
+          PYTHONPATH=$(pwd) pytest -q
 
       - name: Build Docker image
         run: |
