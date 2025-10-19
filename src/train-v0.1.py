@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+import os
 
 def main():
     # Load data
@@ -34,10 +35,10 @@ def main():
     rmse = float(mean_squared_error(y_test, preds, squared=False))
     print(f"RMSE: {rmse:.2f}")
 
-    # Define root directory (two levels up from this script)
-    ROOT_DIR = Path(__file__).parent.parent.resolve()
+    # Define root directory as current working directory
+    ROOT_DIR = Path(os.getcwd()).resolve()
 
-    # Prepare artifacts directory at repo root
+    # Prepare artifacts directory at repo root (working dir)
     artifacts_dir = ROOT_DIR / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
