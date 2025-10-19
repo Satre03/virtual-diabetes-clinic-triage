@@ -52,14 +52,19 @@ jobs:
           echo "repo=ghcr.io/${REPO}" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
+      # 👇 NEW STEP HERE — writes artifacts/meta.json automatically
+      - name: Write version file
+        run: |
+          mkdir -p artifacts
+          printf '{"version":"%s"}' "${{ steps.vars.outputs.tag }}" > artifacts/meta.json
+          echo "Created artifacts/meta.json with version ${{ steps.vars.outputs.tag }}"
+          cat artifacts/meta.json
+
       - name: Build Docker image
         run: |
           docker build \
-          --build-arg MODEL_VERSION=${{ steps.vars.outputs.tag }} \
-          -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
-
-
-            
+            --build-arg MODEL_VERSION=${{ steps.vars.outputs.tag }} \
+            -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
 
       - name: Smoke test container
         run: |
