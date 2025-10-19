@@ -50,7 +50,9 @@ jobs:
           MODEL_VERSION: ${{ steps.vars.outputs.tag }}
         run: |
           echo "Starting model training with MODEL_VERSION=$MODEL_VERSION ..."
-          python src/train-v0.1.py
+          TRAIN_SCRIPT="src/train-${MODEL_VERSION}.py"
+          echo "Running training script: $TRAIN_SCRIPT"
+          python "$TRAIN_SCRIPT" --version "$MODEL_VERSION"
 
       - name: Run tests
         run: |
