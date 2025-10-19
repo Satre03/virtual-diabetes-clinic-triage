@@ -6,7 +6,7 @@ ENV MODEL_VERSION=$MODEL_VERSION
 WORKDIR /app
 
 COPY requirements.txt requirements.txt
-COPY artifacts/ artifacts/
+COPY src/ artifacts/
 COPY src/ src/
 
 RUN pip install --no-cache-dir -r requirements.txt
