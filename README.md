@@ -31,10 +31,6 @@ Installing dependencies
 ```bash
 pip install -r requirements.txt
 ```
-Train model manuelly (not required)
-```bash
-python src/train.py
-```
 Build Docker-image
 ```bash
 docker build -t ghcr.io/satre03/virtual-diabetes-clinic-triage:v.01 .
@@ -83,6 +79,7 @@ Då nås API:t på:
 ```bash
 http://localhost:8002/health
 ```
+
 
 
 
