@@ -49,6 +49,24 @@ jobs:
       - name: Build Docker image
         run: docker build -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
 
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -e
+          IMAGE="${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}"
+          CID=ci-smoke
+          docker run -d --name "$CID" -p 8000:8000 "$IMAGE"
+          trap 'docker logs "$CID" || true; docker rm -f "$CID" || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              echo "Healthcheck OK"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Healthcheck failed"
+          exit 1
+
       - name: Log in to GHCR
         if: ${{ github.event_name != 'pull_request' }}
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
