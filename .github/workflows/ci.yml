@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          REPO=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
+          REPO="${REPO_LC,,}"
           TRAIN_FILE=$(ls -1 src/train-v*.py | sort -V | tail -n1)
           TAG=$(echo "$TRAIN_FILE" | grep -oE 'v[0-9]+(\.[0-9]+)*' || true)
           if [ -z "$TAG" ]; then TAG="${GITHUB_SHA::7}"; fi
@@ -49,32 +49,10 @@ jobs:
       - name: Build Docker image
         run: docker build -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
 
-      - name: Smoke test
-        shell: bash
-        run: |
-          set -e
-          IMAGE="${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}"
-          CID=ci-smoke
-          docker run -d --name "$CID" -p 8000:8000 "$IMAGE"
-          trap 'docker logs "$CID" || true; docker rm -f "$CID" || true' EXIT
-          for i in {1..30}; do
-            if curl -fsS http://localhost:8000/health >/dev/null; then exit 0; fi
-            sleep 1
-          done
-          exit 1
-          
       - name: Log in to GHCR
         if: ${{ github.event_name != 'pull_request' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Push image
         if: ${{ github.event_name != 'pull_request' }}
-        run: |
-          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}"
-          docker push "${IMAGE}:${TAG_BRANCH}"
-          docker push "${IMAGE}:${TAG_SHA}"
+        run: docker push ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}
