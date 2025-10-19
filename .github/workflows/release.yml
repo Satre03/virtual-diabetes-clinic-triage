@@ -28,15 +28,17 @@ jobs:
       - name: Extract version from tag
         id: extract_version
         run: |
-          # Strip leading 'v' from tag, e.g. 'v0.2' -> '0.2'
-          VERSION=${GITHUB_REF#refs/tags/v}
+          # Extract tag name, e.g., refs/tags/v0.2 -> v0.2
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          # Strip leading 'v', e.g., v0.2 -> 0.2
+          VERSION=${TAG_NAME#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: Select training script based on version
         id: select_train
         run: |
           VERSION=${{ steps.extract_version.outputs.version }}
-          # Default script if no match found
           TRAIN_SCRIPT="src/train-v0.1.py"
           if [[ "$VERSION" == "0.1" ]]; then
             TRAIN_SCRIPT="src/train-v0.1.py"
@@ -82,18 +84,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set image name and tag from repo and git tag
+      - name: Set image name and tag
         id: vars
         run: |
-          IMAGE_NAME=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
-          TAG=${GITHUB_REF##*/}
+          IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY,,}"
+          TAG=${{ steps.extract_version.outputs.tag_name }}
           echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} .
+          docker build -t ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} .
 
       - name: Push Docker image
         run: |
-          docker push ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+          docker push ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
