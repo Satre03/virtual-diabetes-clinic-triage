@@ -1,73 +1,70 @@
 import argparse
+from pathlib import Path
+from datetime import datetime, timezone
 import json
 import joblib
-import os
 import numpy as np
-from datetime import datetime, timezone
 from sklearn.datasets import load_diabetes
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
+from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
-RANDOM_SEED = 42
+def main(version: str):
+    print(f"Starting training for version {version}")
 
-def get_model():
-    """Returns a linear regression pipeline with standard scaling."""
-    print("Using LinearRegression (v0.1)")
-    return Pipeline([
+    # Load data
+    data = load_diabetes(as_frame=False)
+    X, y = data.data, data.target
+
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    # Define pipeline (currently only LinearRegression for all versions, 
+    # but can add branching logic here if you want different models for different versions)
+    pipeline = Pipeline([
         ("scaler", StandardScaler()),
         ("model", LinearRegression())
     ])
 
-def main(version: str):
-    print(f"Training model version: {version}")
-
-    # Load dataset
-    data = load_diabetes(as_frame=True)
-    X = data.frame.drop(columns=["target"])
-    y = data.frame["target"]
-
-    # Train/test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=RANDOM_SEED
-    )
-
-    # Initialize and train model
-    model = get_model()
-    model.fit(X_train, y_train)
+    # Train
+    pipeline.fit(X_train, y_train)
 
     # Evaluate
-    preds = model.predict(X_test)
-    rmse = np.sqrt(mean_squared_error(y_test, preds))
-    print(f"Test RMSE: {rmse:.4f}")
+    preds = pipeline.predict(X_test)
+    rmse = float(mean_squared_error(y_test, preds, squared=False))
+    print(f"RMSE: {rmse:.4f}")
 
-    # Create artifacts directory
-    os.makedirs("artifacts", exist_ok=True)
+    # Save artifacts
+    artifacts_dir = Path("artifacts")
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save model
-    model_path = f"artifacts/model_v{version}.joblib"
-    joblib.dump(model, model_path)
+    model_path = artifacts_dir / f"model_v{version}.joblib"
+    joblib.dump(pipeline, model_path)
     print(f"Model saved to {model_path}")
 
-    # Save feature list
-    with open("artifacts/feature_list.json", "w") as f:
-        json.dump(list(X.columns), f)
-    print("Feature list saved.")
-
-    # Save metadata
-    metadata = {
+    meta = {
+        "pipeline": "linear_regression",
         "version": version,
         "rmse": rmse,
         "trained_at": datetime.now(timezone.utc).isoformat()
     }
-    with open("artifacts/meta.json", "w") as f:
-        json.dump(metadata, f, indent=2)
-    print("Training metadata saved.")
+    meta_path = artifacts_dir / "meta.json"
+    meta_path.write_text(json.dumps(meta, indent=2))
+    print(f"Metadata saved to {meta_path}")
+
+    print(json.dumps(meta, indent=2))
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--version", type=str, required=True, help="Model version (e.g. 0.1)")
+    parser = argparse.ArgumentParser(description="Train linear regression model.")
+    parser.add_argument(
+        "--version",
+        type=str,
+        required=True,
+        help="Model version string, e.g. 0.1"
+    )
     args = parser.parse_args()
     main(args.version)
