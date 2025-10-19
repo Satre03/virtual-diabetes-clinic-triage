@@ -1,64 +1,50 @@
-import argparse
+from pathlib import Path
+from datetime import datetime, timezone
 import json
 import joblib
-import os
 import numpy as np
-from datetime import datetime, timezone
 from sklearn.datasets import load_diabetes
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
+from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
-RANDOM_SEED = 42
+# Load data
+data = load_diabetes(as_frame=False)
+X, y = data.data, data.target
 
-def get_model(version: str):
-    if version == "0.1":
-        print("Using LinearRegression (v0.1)")
-        return Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", LinearRegression())
-        ])
-    else:
-        raise ValueError(f"Unknown model version: {version}")
+# Split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 
-def main(version: str):
-    print(f"Training model version {version}")
-    data = load_diabetes(as_frame=True)
-    X = data.frame.drop(columns=["target"])
-    y = data.frame["target"]
+# Define pipeline
+pipeline = Pipeline([
+    ("scaler", StandardScaler()),
+    ("model", LinearRegression())
+])
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_SEED)
+# Train
+pipeline.fit(X_train, y_train)
 
-    model = get_model(version)
-    model.fit(X_train, y_train)
+# Evaluate
+preds = pipeline.predict(X_test)
+rmse = float(mean_squared_error(y_test, preds, squared=False))
+print(f"RMSE: {rmse:.2f}")
 
-    preds = model.predict(X_test)
-    rmse = np.sqrt(mean_squared_error(y_test, preds))
-    print(f"Test RMSE: {rmse:.4f}")
+# Save artifacts
+artifacts_dir = Path("artifacts")
+artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    os.makedirs("artifacts", exist_ok=True)
-    model_path = f"artifacts/model_v{version}.joblib"
-    joblib.dump(model, model_path)
-    print(f"Model saved to {model_path}")
+joblib.dump(pipeline, artifacts_dir / "model.joblib")
 
-    feature_path = "artifacts/feature_list.json"
-    with open(feature_path, "w") as f:
-        json.dump(list(X.columns), f)
-    print(f"Features saved to {feature_path}")
+meta = {
+    "pipeline": "baseline",
+    "version": "0.1.0",
+    "rmse": rmse,
+    "trained_at": datetime.now(timezone.utc).isoformat()
+}
+(artifacts_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
-    meta = {
-        "version": version,
-        "rmse": rmse,
-        "trained_at": datetime.now(timezone.utc).isoformat()
-    }
-    with open("artifacts/meta.json", "w") as f:
-        json.dump(meta, f, indent=2)
-    print("Meta saved to artifacts/meta.json")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--version", type=str, required=True, help="Model version (e.g., 0.1)")
-    args = parser.parse_args()
-    main(args.version)
+print(json.dumps(meta, indent=2))
