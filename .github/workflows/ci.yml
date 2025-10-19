@@ -2,9 +2,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "ite2" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "ite2" ]
 
 permissions:
   contents: read
