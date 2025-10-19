@@ -2,10 +2,10 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "**" ]         # Run on all branches
-    tags:     [ "v*" ]         # Also run on version tags like v0.1, v0.2
+    branches: [ "**" ]         
+    tags:     [ "v*" ]         
   pull_request:
-    branches: [ "**" ]         # Run on all PRs for any branch
+    branches: [ "**" ]        
 
 permissions:
   contents: read
@@ -37,20 +37,20 @@ jobs:
         id: vars
         run: |
           REPO=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          echo "repo=ghcr.io/${REPO}" >> $GITHUB_OUTPUT
 
-          # Determine if this is a tag or branch
-          REF_TYPE="${GITHUB_REF_TYPE:-}"
-          REF_NAME="${GITHUB_REF_NAME:-}"
-          SHORT_SHA="${GITHUB_SHA::7}"
+          REF=${GITHUB_REF}
+          SHORT_SHA=${GITHUB_SHA::7}
 
-          if [[ "$REF_TYPE" == "tag" ]]; then
-            # Use tag name directly
-            TAG="$REF_NAME"
+          if [[ "$REF" == refs/tags/* ]]; then
+            TAG="${REF#refs/tags/}"
+          elif [[ "$REF" == refs/heads/* ]]; then
+            BRANCH="${REF#refs/heads/}"
+            TAG="${BRANCH}-${SHORT_SHA}"
           else
-            # Use branchname-sha for uniqueness
-            TAG="${REF_NAME}-${SHORT_SHA}"
+            TAG="$SHORT_SHA"
           fi
+
+          echo "repo=ghcr.io/${REPO}" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
