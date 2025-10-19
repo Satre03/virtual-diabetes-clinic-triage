@@ -3,10 +3,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from pathlib import Path
 from contextlib import asynccontextmanager
-import os
-import json
-import joblib
-import numpy as np
+import os, json, joblib, numpy as np
 
 ART_DIR = Path("artifacts")
 MODEL_PATH = ART_DIR / "model.joblib"
@@ -37,7 +34,7 @@ class PredictRequest(BaseModel):
 
 class PredictResponse(BaseModel):
     prediction: float
-    version: str  # renamed from model_version
+    model_version: str
     model_config = {"protected_namespaces": ()}
 
 @asynccontextmanager
@@ -79,10 +76,7 @@ def predict(req: PredictRequest, model=Depends(get_model), app_req: Request = No
         y = float(model.predict(X)[0])
     except AttributeError:
         y = float(model(X)[0])
-    return PredictResponse(
-        prediction=y,
-        version=getattr(app_req.app.state, "meta", {}).get("version", "unknown")
-    )
+    return PredictResponse(prediction=y, model_version=getattr(app_req.app.state, "meta", {}).get("version", "unknown"))
 
 @app.exception_handler(ValueError)
 async def _value_error_handler(_, exc: ValueError):
