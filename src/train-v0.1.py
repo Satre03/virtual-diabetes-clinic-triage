@@ -41,7 +41,7 @@ joblib.dump(pipeline, artifacts_dir / "model.joblib")
 
 meta = {
     "pipeline": "baseline",
-    "version": "v0.1",
+    "version": "0.1.0",
     "rmse": rmse,
     "trained_at": datetime.now(timezone.utc).isoformat()
 }
