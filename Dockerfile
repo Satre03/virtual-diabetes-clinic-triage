@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 ARG MODEL_VERSION=unknown
 ENV MODEL_VERSION=$MODEL_VERSION
 
-COPY src/ .src/
+COPY src/ src/
 COPY artifacts/ artifacts/
 
 
