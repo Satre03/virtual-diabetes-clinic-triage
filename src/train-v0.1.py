@@ -1,50 +1,71 @@
-from pathlib import Path
-from datetime import datetime, timezone
+import argparse
 import json
 import joblib
+import os
 import numpy as np
 from sklearn.datasets import load_diabetes
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
-# Load data
-data = load_diabetes(as_frame=False)
-X, y = data.data, data.target
+RANDOM_SEED = 42
 
-# Split
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+def get_model(version: str):
+    if version == "0.1":
+        print("Using LinearRegression (v0.1)")
+        return Pipeline([
+            ("scaler", StandardScaler()),
+            ("model", LinearRegression())
+        ])
+    elif version == "0.2":
+        print("Using RandomForestRegressor (v0.2)")
+        return Pipeline([
+            ("scaler", StandardScaler()),
+            ("model", RandomForestRegressor(
+                n_estimators=400,
+                max_depth=10,
+                max_features='sqrt',
+                random_state=RANDOM_SEED
+            ))
+        ])
+    else:
+        raise ValueError(f"Unknown model version: {version}")
 
-# Define pipeline
-pipeline = Pipeline([
-    ("scaler", StandardScaler()),
-    ("model", LinearRegression())
-])
+def main(version: str):
+    print(f"Training model version {version}")
+    data = load_diabetes(as_frame=True)
+    X = data.frame.drop(columns=["target"])
+    y = data.frame["target"]
 
-# Train
-pipeline.fit(X_train, y_train)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_SEED)
 
-# Evaluate
-preds = pipeline.predict(X_test)
-rmse = float(mean_squared_error(y_test, preds, squared=False))
-print(f"RMSE: {rmse:.2f}")
+    model = get_model(version)
+    model.fit(X_train, y_train)
 
-# Save artifacts
-artifacts_dir = Path("artifacts")
-artifacts_dir.mkdir(parents=True, exist_ok=True)
+    preds = model.predict(X_test)
+    rmse = np.sqrt(mean_squared_error(y_test, preds))
+    print(f"Test RMSE: {rmse:.4f}")
 
-joblib.dump(pipeline, artifacts_dir / "model.joblib")
+    os.makedirs("artifacts", exist_ok=True)
+    model_path = f"artifacts/model_v{version}.joblib"
+    joblib.dump(model, model_path)
+    print(f"Model saved to {model_path}")
 
-meta = {
-    "pipeline": "baseline",
-    "version": "0.1.0",
-    "rmse": rmse,
-    "trained_at": datetime.now(timezone.utc).isoformat()
-}
-(artifacts_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+    feature_path = "artifacts/feature_list.json"
+    with open(feature_path, "w") as f:
+        json.dump(list(X.columns), f)
+    print(f"Features saved to {feature_path}")
 
-print(json.dumps(meta, indent=2))
+    metrics = {"version": version, "rmse": rmse}
+    with open("artifacts/metrics.json", "w") as f:
+        json.dump(metrics, f, indent=4)
+    print("Metrics saved to artifacts/metrics.json")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--version", type=str, required=True, help="Model version (e.g., 0.1 or 0.2)")
+    args = parser.parse_args()
+    main(args.version)
