@@ -54,10 +54,12 @@ jobs:
 
       - name: Build Docker image
         run: |
-          echo "Building Docker image with tag: ${{ steps.vars.outputs.tag }}"
           docker build \
-            --build-arg MODEL_VERSION=${{ steps.vars.outputs.tag }} \
-            -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
+          --build-arg MODEL_VERSION=${{ steps.vars.outputs.tag }} \
+          -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
+
+
+            
 
       - name: Smoke test container
         run: |
