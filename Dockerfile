@@ -1,15 +1,16 @@
 FROM python:3.11-slim
 
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 ARG MODEL_VERSION=unknown
 ENV MODEL_VERSION=$MODEL_VERSION
 
-WORKDIR /app
-
-COPY requirements.txt requirements.txt
+COPY src/ .src/
 COPY artifacts/ artifacts/
-COPY src/ src/
 
-RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8000
 
