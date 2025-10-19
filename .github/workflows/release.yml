@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'  # triggers on tags like v0.1, v0.2, etc.
+      - 'v*'
 
 permissions:
   contents: read
@@ -28,9 +28,7 @@ jobs:
       - name: Extract version from tag
         id: extract_version
         run: |
-          # Extract tag name, e.g., refs/tags/v0.2 -> v0.2
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          # Strip leading 'v', e.g., v0.2 -> 0.2
           VERSION=${TAG_NAME#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
@@ -53,7 +51,6 @@ jobs:
         run: |
           VERSION=${{ steps.extract_version.outputs.version }}
           TRAIN_SCRIPT=${{ steps.select_train.outputs.train_script }}
-          echo "Training version $VERSION using $TRAIN_SCRIPT"
           python "$TRAIN_SCRIPT" --version "$VERSION"
 
       - uses: actions/upload-artifact@v4
@@ -70,8 +67,6 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/download-artifact@v4
         with:
           name: artifacts
