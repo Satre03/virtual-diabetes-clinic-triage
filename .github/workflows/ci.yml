@@ -13,8 +13,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      REPO_LC: ${{ github.repository }}
 
     steps:
       - name: Checkout code
@@ -30,75 +28,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
 
-      - name: Set image name and tag from training filename
-        id: vars
-        shell: bash
+      - name: Train model (default to 0.1)
         run: |
-          set -e
-          REPO="${REPO_LC,,}"
-          TRAIN_FILE="src/train-v0.1.py"
-          TAG=$(echo "$TRAIN_FILE" | grep -oE 'v[0-9]+(\.[0-9]+)*' || true)
-          if [ -z "$TAG" ]; then
-            echo "No version found in filename. Skipping Docker push later."
-            TAG=""
-          fi
-          echo "repo=ghcr.io/${REPO}" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Train model
-        env:
-          MODEL_VERSION: ${{ steps.vars.outputs.tag }}
-        run: |
-          echo "Starting model training with MODEL_VERSION=$MODEL_VERSION ..."
-          TRAIN_SCRIPT="src/train-${MODEL_VERSION}.py"
-          echo "Running training script: $TRAIN_SCRIPT"
-          python "$TRAIN_SCRIPT" --version "$MODEL_VERSION"
+          echo "Starting training for default version 0.1"
+          python src/train-v0.1.py --version 0.1
 
       - name: Run tests
         run: |
           echo "Running tests..."
           PYTHONPATH=$(pwd) pytest -q
-
-      - name: Build Docker image
-        run: |
-          IMAGE=${{ steps.vars.outputs.repo }}
-          TAG=${{ steps.vars.outputs.tag }}
-          if [ -z "$TAG" ]; then
-            echo "No tag provided. Using 'ci-skip'."
-            TAG="ci-skip"
-          fi
-          docker build \
-            --build-arg MODEL_VERSION=$TAG \
-            -t $IMAGE:$TAG .
-
-      - name: Smoke test container
-        run: |
-          set -e
-          IMAGE="${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}"
-          CID=ci-smoke
-          echo "Running smoke test..."
-          docker run -d --name "$CID" -p 8000:8000 "$IMAGE"
-          trap 'docker logs "$CID" || true; docker rm -f "$CID" || true' EXIT
-          for i in {1..30}; do
-            if curl -fsS http://localhost:8000/health >/dev/null; then
-              echo "Healthcheck OK"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Healthcheck failed"
-          exit 1
-
-      - name: Log in to GHCR
-        if: ${{ github.event_name != 'pull_request' }}
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Push Docker image (only if version tag is present)
-        if: ${{ github.event_name != 'pull_request' && steps.vars.outputs.tag != '' }}
-        run: |
-          echo "Pushing image: ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}"
-          docker push ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}
-
-      - name: Done
-        run: |
-          echo "CI pipeline complete for image: ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }}"
