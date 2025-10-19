@@ -8,9 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 ARG MODEL_VERSION=unknown
 ENV MODEL_VERSION=$MODEL_VERSION
 
-COPY src/ src/
-COPY artifacts/ artifacts/
-
+COPY models/model_v${MODEL_VERSION}.joblib ./models/model_v${MODEL_VERSION}.joblib
+COPY models/feature_list.json ./models/feature_list.json
 
 EXPOSE 8000
 
