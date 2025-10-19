@@ -3,105 +3,118 @@ from datetime import datetime, timezone
 import json
 import joblib
 import numpy as np
-from sklearn.datasets import load_diabetes
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import Ridge
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, precision_recall_fscore_support, roc_auc_score
 
+from sklearn.datasets import load_diabetes
+from sklearn.linear_model import Ridge
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, precision_score, recall_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.isotonic import IsotonicRegression
+
+# -----------------------------
 # Load data
+# -----------------------------
 data = load_diabetes(as_frame=False)
 X, y = data.data, data.target
 
-# Split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# Define models and parameter grids
-models = [
-    ("Ridge", Pipeline([
-        ("scaler", StandardScaler()),
-        ("model", Ridge())
-    ]), {
-        "model__alpha": [0.1, 1.0, 10.0, 100.0]
-    }),
-    ("RandomForest", Pipeline([
-        ("model", RandomForestRegressor(random_state=42, n_jobs=-1))
-    ]), {
-        "model__n_estimators": [200, 500],
-        "model__max_depth": [None, 8, 16],
-        "model__min_samples_leaf": [1, 3, 5]
-    })
-]
+# -----------------------------
+# Define Ridge pipeline
+# -----------------------------
+pipeline = Pipeline([
+    ("scaler", StandardScaler()),
+    ("model", Ridge(alpha=1.0, random_state=42))
+])
 
-# Train and select best model
-best_model = None
-best_name = None
-best_rmse = float("inf")
-best_params = None
+# -----------------------------
+# Train Ridge model
+# -----------------------------
+pipeline.fit(X_train, y_train)
 
-for name, pipeline, params in models:
-    grid = GridSearchCV(
-        pipeline,
-        params,
-        scoring="neg_root_mean_squared_error",
-        cv=5,
-        n_jobs=-1,
-        refit=True
-    )
-    grid.fit(X_train, y_train)
-    rmse_cv = -grid.best_score_
-    if rmse_cv < best_rmse:
-        best_rmse = rmse_cv
-        best_model = grid.best_estimator_
-        best_name = name
-        best_params = grid.best_params_
+# -----------------------------
+# Evaluate RMSE
+# -----------------------------
+preds_train = pipeline.predict(X_train)
+preds_test = pipeline.predict(X_test)
+rmse = float(mean_squared_error(y_test, preds_test, squared=False))
+print(f"RMSE (Ridge): {rmse:.2f}")
 
-# Evaluate
-preds = best_model.predict(X_test)
-rmse = float(mean_squared_error(y_test, preds, squared=False))
-print(f"Best model: {best_name}")
-print(f"RMSE: {rmse:.2f}")
+# -----------------------------
+# Create “high-risk” flag (top 25% of targets)
+# -----------------------------
+thr_value = float(np.percentile(y_train, 75))
+y_train_high = (y_train >= thr_value).astype(int)
+y_test_high = (y_test >= thr_value).astype(int)
 
-# Optional classification metrics (high-risk threshold)
-threshold = np.percentile(y_train, 75)
-y_true_flag = (y_test >= threshold).astype(int)
-y_pred_flag = (preds >= threshold).astype(int)
+# -----------------------------
+# Calibrate using Isotonic Regression
+# -----------------------------
+iso = IsotonicRegression(out_of_bounds="clip")
+iso.fit(preds_train, y_train_high)
+prob_test = iso.predict(preds_test)
 
-precision, recall, f1, _ = precision_recall_fscore_support(
-    y_true_flag, y_pred_flag, average="binary", zero_division=0
-)
-try:
-    auroc = float(roc_auc_score(y_true_flag, preds))
-except ValueError:
-    auroc = float("nan")
+y_pred_flag = (prob_test >= 0.5).astype(int)
+precision = float(precision_score(y_test_high, y_pred_flag, zero_division=0))
+recall = float(recall_score(y_test_high, y_pred_flag, zero_division=0))
 
-print(f"Precision: {precision:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}, AUROC: {auroc:.3f}")
+print(f"Precision@0.5: {precision:.2f}")
+print(f"Recall@0.5: {recall:.2f}")
 
+# -----------------------------
 # Save artifacts
-artifacts_dir = Path("artifacts")
+# -----------------------------
+artifacts_dir = Path("artifacts/v0_2")
 artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-joblib.dump(best_model, artifacts_dir / "model.joblib")
+joblib.dump(pipeline, artifacts_dir / "model.joblib")
+joblib.dump(iso, artifacts_dir / "isotonic_calibrator.joblib")
+
+(artifacts_dir / "risk_threshold.json").write_text(json.dumps({
+    "threshold_label": "75th percentile",
+    "threshold_value_on_y_train": thr_value,
+    "classification_threshold_on_calibrated_prob": 0.5
+}, indent=2))
 
 meta = {
-    "pipeline": best_name,
+    "pipeline": "v0.2",
+    "selected_model": "Ridge",
     "version": "0.2.0",
-    "cv_rmse": float(best_rmse),
-    "rmse": rmse,
+    "dataset": "sklearn.diabetes",
     "trained_at": datetime.now(timezone.utc).isoformat(),
-    "params": best_params,
-    "classification": {
-        "threshold_percentile": 75,
-        "precision": float(precision),
-        "recall": float(recall),
-        "f1": float(f1),
-        "auroc": auroc
+    "rmse": rmse,
+    "metrics": {
+        "precision_at_0.5": precision,
+        "recall_at_0.5": recall,
+        "high_risk_threshold_on_y_train": "75th percentile"
     }
 }
 (artifacts_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+
+# -----------------------------
+# Update CHANGELOG.md
+# -----------------------------
+changelog_path = Path("CHANGELOG.md")
+fmt = lambda x: f"{x:.4f}"
+
+lines = []
+lines.append(f"## v0.2 — {datetime.now(timezone.utc).date().isoformat()}")
+lines.append("**Iteration 2:** Switched to Ridge Regression, improved preprocessing with StandardScaler, and added calibrated high-risk flag (Isotonic Regression).")
+lines.append("")
+lines.append("### Metrics (test set)")
+lines.append(f"- Ridge RMSE={fmt(rmse)}")
+lines.append(f"- precision@0.5={fmt(precision)}, recall@0.5={fmt(recall)}")
+lines.append("")
+
+if changelog_path.exists():
+    existing = changelog_path.read_text(encoding="utf-8")
+    new_content = existing + ("\n" if not existing.endswith("\n") else "") + "\n".join(lines) + "\n"
+else:
+    new_content = "# CHANGELOG\n\n" + "\n".join(lines) + "\n"
+
+changelog_path.write_text(new_content, encoding="utf-8")
 
 print(json.dumps(meta, indent=2))
