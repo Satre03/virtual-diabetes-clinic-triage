@@ -35,28 +35,43 @@ def main():
     rmse = float(mean_squared_error(y_test, preds, squared=False))
     print(f"RMSE: {rmse:.2f}")
 
-    # Define root directory as current working directory
-    ROOT_DIR = Path(os.getcwd()).resolve()
+    # Define root directory as parent of current working dir (assuming script runs from src)
+    ROOT_DIR = Path(os.getcwd()).parent.resolve()
 
-    # Prepare artifacts directory at repo root (working dir)
+    # Artifacts directory at repo root (already exists)
     artifacts_dir = ROOT_DIR / "artifacts"
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Artifacts directory: {artifacts_dir}")
+
+    # Test writing a test file to check permissions
+    test_file = artifacts_dir / "test_write.txt"
+    try:
+        test_file.write_text("This is a test file to check write permissions.")
+        print(f"Test file written successfully: {test_file}")
+        test_file.unlink()  # Clean up test file after checking
+    except Exception as e:
+        print(f"Failed to write test file: {e}")
 
     # Save the trained model
-    model_path = artifacts_dir / "model.joblib"
-    joblib.dump(pipeline, model_path)
-    print(f"Model saved to {model_path}")
+    try:
+        model_path = artifacts_dir / "model.joblib"
+        joblib.dump(pipeline, model_path)
+        print(f"Model saved to {model_path}")
+    except Exception as e:
+        print(f"Failed to save model: {e}")
 
     # Save metadata
-    meta = {
-        "pipeline": "LinearRegression + StandardScaler",
-        "version": "0.1.0",
-        "rmse": rmse,
-        "trained_at": datetime.now(timezone.utc).isoformat()
-    }
-    meta_path = artifacts_dir / "meta.json"
-    meta_path.write_text(json.dumps(meta, indent=2))
-    print(f"Metadata saved to {meta_path}")
+    try:
+        meta = {
+            "pipeline": "LinearRegression + StandardScaler",
+            "version": "0.1.0",
+            "rmse": rmse,
+            "trained_at": datetime.now(timezone.utc).isoformat()
+        }
+        meta_path = artifacts_dir / "meta.json"
+        meta_path.write_text(json.dumps(meta, indent=2))
+        print(f"Metadata saved to {meta_path}")
+    except Exception as e:
+        print(f"Failed to save metadata: {e}")
 
 if __name__ == "__main__":
     main()
