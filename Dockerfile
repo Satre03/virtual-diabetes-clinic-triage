@@ -5,11 +5,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
 COPY src src
 
-# Copy artifacts folder from repo root
-COPY artifacts artifacts
+COPY artifacts ./artifacts
 
 EXPOSE 8000
 
