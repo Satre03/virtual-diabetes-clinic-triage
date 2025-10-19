@@ -54,6 +54,12 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}   # build only on tag runs
+        run: |
+          docker build -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
+
+
+      - name: Build Docker image
         run: |
           docker build -t ${{ steps.vars.outputs.repo }}:${{ steps.vars.outputs.tag }} .
 
