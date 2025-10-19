@@ -3,8 +3,8 @@ import json
 import joblib
 import os
 import numpy as np
+from datetime import datetime, timezone
 from sklearn.datasets import load_diabetes
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
@@ -19,17 +19,6 @@ def get_model(version: str):
         return Pipeline([
             ("scaler", StandardScaler()),
             ("model", LinearRegression())
-        ])
-    elif version == "0.2":
-        print("Using RandomForestRegressor (v0.2)")
-        return Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", RandomForestRegressor(
-                n_estimators=400,
-                max_depth=10,
-                max_features='sqrt',
-                random_state=RANDOM_SEED
-            ))
         ])
     else:
         raise ValueError(f"Unknown model version: {version}")
@@ -59,13 +48,17 @@ def main(version: str):
         json.dump(list(X.columns), f)
     print(f"Features saved to {feature_path}")
 
-    metrics = {"version": version, "rmse": rmse}
-    with open("artifacts/metrics.json", "w") as f:
-        json.dump(metrics, f, indent=4)
-    print("Metrics saved to artifacts/metrics.json")
+    meta = {
+        "version": version,
+        "rmse": rmse,
+        "trained_at": datetime.now(timezone.utc).isoformat()
+    }
+    with open("artifacts/meta.json", "w") as f:
+        json.dump(meta, f, indent=2)
+    print("Meta saved to artifacts/meta.json")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", type=str, required=True, help="Model version (e.g., 0.1 or 0.2)")
+    parser.add_argument("--version", type=str, required=True, help="Model version (e.g., 0.1)")
     args = parser.parse_args()
     main(args.version)
