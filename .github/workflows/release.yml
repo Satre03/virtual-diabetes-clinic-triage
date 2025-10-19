@@ -63,10 +63,10 @@ jobs:
           TAG=${GITHUB_REF##*/}
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Build Docker image
+      - name: Build Docker image (tagged v0.2)
         run: |
-          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} .
+          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}:v0.2 .
 
-      - name: Push Docker image
+      - name: Push Docker image (tagged v0.2)
         run: |
-          docker push ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+          docker push ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}:v0.2
