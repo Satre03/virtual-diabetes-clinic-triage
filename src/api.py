@@ -8,7 +8,7 @@ import json
 import joblib
 import numpy as np
 
-ART_DIR = Path("src/artifacts")
+ART_DIR = Path("artifacts")
 MODEL_PATH = ART_DIR / "model.joblib"
 META_PATH = ART_DIR / "meta.json"
 
