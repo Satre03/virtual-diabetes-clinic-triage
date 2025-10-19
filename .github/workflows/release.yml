@@ -65,8 +65,8 @@ jobs:
 
       - name: Build Docker image (tagged v0.2)
         run: |
-          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}:v0.2 .
+          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}: .
 
       - name: Push Docker image (tagged v0.2)
         run: |
-          docker push ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}:v0.2
+          docker push ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}:
