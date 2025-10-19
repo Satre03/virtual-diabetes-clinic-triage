@@ -3,9 +3,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from pathlib import Path
 from contextlib import asynccontextmanager
-import os, json, joblib, numpy as np
+import os
+import json
+import joblib
+import numpy as np
 
-# Expect artifacts folder at the root, next to src/
 ART_DIR = Path("artifacts")
 MODEL_PATH = ART_DIR / "model.joblib"
 META_PATH = ART_DIR / "meta.json"
@@ -35,7 +37,8 @@ class PredictRequest(BaseModel):
 
 class PredictResponse(BaseModel):
     prediction: float
-    model_version: str
+    version: str  # renamed from model_version
+    model_config = {"protected_namespaces": ()}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -76,7 +79,10 @@ def predict(req: PredictRequest, model=Depends(get_model), app_req: Request = No
         y = float(model.predict(X)[0])
     except AttributeError:
         y = float(model(X)[0])
-    return PredictResponse(prediction=y, model_version=getattr(app_req.app.state, "meta", {}).get("version", "unknown"))
+    return PredictResponse(
+        prediction=y,
+        version=getattr(app_req.app.state, "meta", {}).get("version", "unknown")
+    )
 
 @app.exception_handler(ValueError)
 async def _value_error_handler(_, exc: ValueError):
