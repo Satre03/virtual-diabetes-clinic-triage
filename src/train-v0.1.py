@@ -34,8 +34,11 @@ def main():
     rmse = float(mean_squared_error(y_test, preds, squared=False))
     print(f"RMSE: {rmse:.2f}")
 
-    # Prepare artifacts directory at root
-    artifacts_dir = Path("artifacts")
+    # Define root directory (two levels up from this script)
+    ROOT_DIR = Path(__file__).parent.parent.resolve()
+
+    # Prepare artifacts directory at repo root
+    artifacts_dir = ROOT_DIR / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
     # Save the trained model
