@@ -7,7 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# This ARG will be set by GitHub Actions
 ARG MODEL_VERSION
 ENV MODEL_VERSION=${MODEL_VERSION}
 
