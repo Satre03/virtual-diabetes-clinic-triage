@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*'  # triggers on v0.1, v0.2 etc.
 
 permissions:
   contents: read
@@ -12,7 +12,6 @@ permissions:
 jobs:
   train:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -25,33 +24,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Extract version from tag
-        id: extract_version
-        run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          VERSION=${TAG_NAME#v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-
-      - name: Select training script based on version
-        id: select_train
-        run: |
-          VERSION=${{ steps.extract_version.outputs.version }}
-          TRAIN_SCRIPT="src/train-v0.1.py"
-          if [[ "$VERSION" == "0.1" ]]; then
-            TRAIN_SCRIPT="src/train-v0.1.py"
-          elif [[ "$VERSION" == "0.2" ]]; then
-            TRAIN_SCRIPT="src/train-v0.2.py"
-          else
-            echo "Warning: Unknown version $VERSION, defaulting to train-v0.1.py"
-          fi
-          echo "train_script=$TRAIN_SCRIPT" >> $GITHUB_OUTPUT
-
       - name: Train model
-        run: |
-          VERSION=${{ steps.extract_version.outputs.version }}
-          TRAIN_SCRIPT=${{ steps.select_train.outputs.train_script }}
-          python "$TRAIN_SCRIPT" --version "$VERSION"
+        run: python src/train.py
 
       - uses: actions/upload-artifact@v4
         with:
@@ -81,18 +55,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set image name and tag
+      - name: Set image name from repo
         id: vars
         run: |
-          IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY,,}"
-          TAG=${{ steps.extract_version.outputs.tag_name }}
+          IMAGE_NAME=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]' | sed 's/-*$//')
           echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          TAG=${GITHUB_REF##*/}
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} .
+          docker build -t ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }} .
 
       - name: Push Docker image
         run: |
-          docker push ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+          docker push ghcr.io/${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
