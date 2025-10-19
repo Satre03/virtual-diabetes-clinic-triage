@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REPO_LC: ${{ github.repository }} # will be lowercased in shell
+      TAG_BRANCH: ${{ github.ref_name }}
+      TAG_SHA: ${{ github.sha }}
 
     steps:
       - name: Checkout
@@ -29,44 +31,23 @@ jobs:
         run: |
           python -m pip install -U pip
           pip install -r requirements.txt pytest
-          python src/train-v0.2.py
+          python src/train.py
           PYTHONPATH=$(pwd) pytest -q
-
-      - name: Upload model artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: model
-          path: |
-            artifacts/model.joblib
-            artifacts/meta.json
-          retention-days: 30
-          if-no-files-found: error
-
-      - name: Compute image name and tags
-        id: tags
-        shell: bash
-        run: |
-          set -euo pipefail
-          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LC}"
-          TAGS="${IMAGE}:${GITHUB_REF_NAME} ${IMAGE}:${GITHUB_SHA}"
-          echo "TAGS=${TAGS}" >> "$GITHUB_ENV"
-          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
-          echo "Tags: $TAGS"
 
       - name: Build Docker image
         run: |
-          set -euo pipefail
-          # shellcheck disable=SC2086
-          docker build $(for t in $TAGS; do printf -- '-t %s ' "$t"; done) .
+          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${REPO_LC}"
+          docker build -t "${IMAGE}:${TAG_BRANCH}" -t "${IMAGE}:${TAG_SHA}" .
 
       - name: Smoke test
         shell: bash
         run: |
           set -euo pipefail
-          IMAGE_TAG=$(echo "$TAGS" | awk '{print $1}') # first tag
+          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${REPO_LC}:${TAG_BRANCH}"
           CID=ci-smoke
-          docker run -d --name "$CID" -p 8000:8000 "$IMAGE_TAG"
+          docker run -d --name "$CID" -p 8000:8000 "$IMAGE"
           trap 'docker logs "$CID" || true; docker rm -f "$CID" || true' EXIT
           for i in {1..30}; do
             if curl -fsS http://localhost:8000/health >/dev/null; then
@@ -86,10 +67,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image(s)
+      - name: Push image
         if: ${{ github.event_name != 'pull_request' }}
         run: |
-          set -euo pipefail
-          for tag in $TAGS; do
-            docker push "$tag"
-          done
+          REPO_LC=$(echo "${REPO_LC}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${REPO_LC}"
+          docker push "${IMAGE}:${TAG_BRANCH}"
+          docker push "${IMAGE}:${TAG_SHA}"
