@@ -1,4 +1,3 @@
-# Dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -7,6 +6,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+# Always set a default version, can be overridden by CI
+ARG MODEL_VERSION=v0.0
+ENV MODEL_VERSION=${MODEL_VERSION}
 
 EXPOSE 8000
 
