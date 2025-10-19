@@ -36,10 +36,9 @@ jobs:
           pip install -r requirements.txt pytest
 
       - name: Train model (default to 0.1)
-        working-directory: ./src
         run: |
           echo "Starting training for default version 0.1"
-          python train-v0.1.py --version 0.1
+          python src/train-v0.1.py --version 0.1
 
       - name: Run tests
         run: |
